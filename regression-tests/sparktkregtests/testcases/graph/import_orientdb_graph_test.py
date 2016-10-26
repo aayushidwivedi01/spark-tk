@@ -21,10 +21,18 @@ import unittest
 import uuid
 from sparktkregtests.lib import sparktk_test, config
 
+def get_url():
+        hostname = config.hostname
+        port = 2424
+        db = "db_" + str(uuid.uuid1().hex)
+        return "remote:" + str(hostname) + ":" + str(port) + "/" + db
+
 class ImportOrientDBGraphTest(sparktk_test.SparkTKTestCase):
+    URL = get_url()
+
     def setUp(self):
         """Build frames and graphs to be tested"""
-        super(ImportOrientDBGraphTest, self).setUp()
+        super(ImportOrientDBGraphTest, self).setUpClass()
         graph_data = self.get_file("clique_10_new.csv")
         schema = [('src', str),
                   ('dst', str),
@@ -45,82 +53,87 @@ class ImportOrientDBGraphTest(sparktk_test.SparkTKTestCase):
         self.vertices.drop_duplicates(["id"])
         self.frame.drop_columns(["src_type", "dst_type"])
 
-        self.sparktk_graph = self.context.graph.create(self.vertices, self.frame)
+        self.graph = self.context.graph.create(self.vertices, self.frame)
 
-    def test_import(self):
-        """Tests output of export with default parameters"""
-        url = self.get_url()
-        export_result = self.sparktk_graph.export_to_orientdb(
-            db_url=url, user_name="admin", password="admin",
-            root_password="orient123")
-
-        import_graph = selt.context.graph.import_orientdb_graph(
-            db_url=url, user_name="admin", password="admin",
-            root_password="orient123")
-
-        #verify export_result against known values
-        self.assertEqual(url, export_result.db_uri)
-        self.assertItemsEqual(export_result.edge_types.keys(),['E'])
-        self.assertItemsEqual(export_result.edge_types.values(), [165])
-        self.assertItemsEqual(export_result.vertex_types.keys(),['V'])
-        self.assertItemsEqual(export_result.vertex_types.values(), [54]) 
-        self.assertEqual(
-            export_result.exported_edges_summary["Total Exported Edges Count"],
-            self.sparktk_graph.graphframe.edges.count())
-        self.assertEqual(
-            export_result.exported_vertices_summary["Total Exported Vertices Count"],
-            self.sparktk_graph.graphframe.vertices.count())
-
-    def test_export_edge_vertex_type(self):
+    def test_import_edge_vertex_type(self):
         """Tests export with edge and vertex type parameters"""
-        url = self.get_url()
-        export_result = self.sparktk_graph.export_to_orientdb(
+        url = ImportOrientDBGraphTest.URL
+        export_result = self.graph.export_to_orientdb(
             db_url=url, user_name="admin", password="admin",
             root_password="orient123", vertex_type_column_name="gender",
             edge_type_column_name="edge_type")
 
-        #verify export_result against known values
-        self.assertEqual(url, export_result.db_uri)
-        self.assertItemsEqual(export_result.edge_types.keys(),['follower', 'friend'])
-        self.assertItemsEqual(export_result.edge_types.values(), [85, 80])
-        self.assertItemsEqual(export_result.vertex_types.keys(),['F', 'M'])
-        self.assertItemsEqual(export_result.vertex_types.values(), [26, 28])
-
-        self.assertEqual(
-            export_result.exported_edges_summary["Total Exported Edges Count"],
-            self.sparktk_graph.graphframe.edges.count())
-        self.assertEqual(
-            export_result.exported_vertices_summary["Total Exported Vertices Count"],
-            self.sparktk_graph.graphframe.vertices.count())
+        imported_graph = self.context.graph.import_orientdb_graph(
+            db_url=url, user_name="admin", password="admin",
+            root_password="orient123")
+        self._validate_result(imported_graph)
 
     def test_bad_db_url(self):
         """Tests bad orientDB url throws exception"""
         with self.assertRaisesRegexp(
                 Exception, "Error on opening database \'bad\'"):
-            export_result = self.sparktk_graph.export_to_orientdb(
+            imported_graph = self.context.graph.import_orientdb_graph(
                 db_url="bad", user_name="admin", password="admin",
-                root_password="orient123", vertex_type_column_name="gender",
-                edge_type_column_name="edge_type")
+                root_password="orient123")
 
     def test_bad_root_passwd(self):
         """Tests wrong orientDB password throws exception"""
-        url = self.get_url()
+        url = ImportOrientDBGraphTest.URL
         with self.assertRaisesRegexp(
                 Exception, "Wrong user/password"):
-            export_result = self.sparktk_graph.export_to_orientdb(
+            imported_graph = self.context.graph.import_orientdb_graph(
                 db_url=url, user_name="admin", password="admin",
-                root_password="bad", vertex_type_column_name="gender",
-                edge_type_column_name="edge_type")
+                root_password="bad")
 
-    def test_bad_vertex_type_column_name(self):
-        """Tests incorrext vertex type column name throws exception"""
-        url = self.get_url()
+    def test_bad_user_name(self):
+        """Tests wrong db username throws exception"""
+        url = ImportOrientDBGraphTest.URL
         with self.assertRaisesRegexp(
-                Exception, "Cannot connect to the remote server/database"):
-            export_result = self.sparktk_graph.export_to_orientdb(
-                db_url=url, user_name="admin", password="admin",
-                root_password="bad", vertex_type_column_name="ERR",
-                edge_type_column_name="edge_type")
+                Exception, "Unable to open database"):
+            imported_graph = self.context.graph.import_orientdb_graph(
+                db_url=url, user_name="ERR", password="admin",
+                root_password="orient123")
+   
+    def test_bad_user_password(self):
+        """Tests wrong user password throws exception"""
+        url = ImportOrientDBGraphTest.URL
+        with self.assertRaisesRegexp(
+                Exception, "Unable to open database"):
+            imported_graph = self.context.graph.import_orientdb_graph(
+                db_url=url, user_name="admin", password="ERR",
+                root_password="orient123")
+
+    def _validate_result(self, imported_graph):
+
+        #validate vertices
+        actual_vertices_frame = imported_graph.create_vertices_frame()
+        actual_vertices_pf = actual_vertices_frame.to_pandas(self.vertices.count())
+        expected_vertices_pf = self.vertices.to_pandas(self.vertices.count())
+        actual_vertex_ids = actual_vertices_pf["id"].tolist()
+        expected_vertex_ids = expected_vertices_pf["id"].tolist()
+        self.assertItemsEqual(actual_vertex_ids, expected_vertex_ids)
+
+        #validate edges
+        edges_frame = imported_graph.create_edges_frame()
+        actual_edges = edges_frame.to_pandas(
+            edges_frame.count()).values.tolist()
+        expected_edges = self.frame.to_pandas(
+            self.frame.count()).values.tolist()
+
+        #switch dst and src columns to match the new frame schema
+        expected_edges = [[dst, src, edge_type] for src, dst, edge_type in expected_edges]
+        actual_edges.sort(key=lambda x:x[0])
+        expected_edges.sort(key=lambda x:x[0])
+
+        self.assertItemsEqual(
+            actual_edges,
+            expected_edges)
+
+        #validate degrees of imported graph against that of the original graph
+        actual_degrees_frame = imported_graph.degrees()
+        expected_degrees_frame = self.graph.degrees()
+
+        self.assertFramesEqual(actual_degrees_frame, expected_degrees_frame)
 
     def get_url(self):
         hostname = config.hostname
