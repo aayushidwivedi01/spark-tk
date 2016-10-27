@@ -135,11 +135,5 @@ class ImportOrientDBGraphTest(sparktk_test.SparkTKTestCase):
 
         self.assertFramesEqual(actual_degrees_frame, expected_degrees_frame)
 
-    def get_url(self):
-        hostname = config.hostname
-        port = 2424
-        db = "db_" + str(uuid.uuid1().hex)
-        return "remote:" + str(hostname) + ":" + str(port) + "/" + db
-
 if __name__ == "__main__":
     unittest.main()
