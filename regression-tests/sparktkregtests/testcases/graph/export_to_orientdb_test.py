@@ -15,7 +15,7 @@
 #  limitations under the License.
 #
 
-""" Tests the weighted_degree on a graph"""
+""" Tests graph export to Oriendb"""
 
 import unittest
 import uuid
