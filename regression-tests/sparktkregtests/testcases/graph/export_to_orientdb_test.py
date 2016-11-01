@@ -47,6 +47,7 @@ class ExportToOrientDBTest(sparktk_test.SparkTKTestCase):
 
         self.sparktk_graph = self.context.graph.create(self.vertices, self.frame)
 
+
     def test_default_export(self):
         """Tests output of export with default parameters"""
         url = self.get_url()
@@ -74,14 +75,14 @@ class ExportToOrientDBTest(sparktk_test.SparkTKTestCase):
             db_url=url, user_name="admin", password="admin",
             root_password="orient123", vertex_type_column_name="gender",
             edge_type_column_name="edge_type")
+        print export_result
 
         #verify export_result against known values
         self.assertEqual(url, export_result.db_uri)
         self.assertItemsEqual(export_result.edge_types.keys(),['follower', 'friend'])
-        self.assertItemsEqual(export_result.edge_types.values(), [85, 80])
+        self.assertItemsEqual(export_result.edge_types.values(), [83, 82])
         self.assertItemsEqual(export_result.vertex_types.keys(),['F', 'M'])
-        self.assertItemsEqual(export_result.vertex_types.values(), [26, 28])
-
+        self.assertItemsEqual(export_result.vertex_types.values(), [29, 25])
         self.assertEqual(
             export_result.exported_edges_summary["Total Exported Edges Count"],
             self.sparktk_graph.graphframe.edges.count())
@@ -97,6 +98,7 @@ class ExportToOrientDBTest(sparktk_test.SparkTKTestCase):
                 db_url="bad", user_name="admin", password="admin",
                 root_password="orient123", vertex_type_column_name="gender",
                 edge_type_column_name="edge_type")
+
 
     def test_bad_root_passwd(self):
         """Tests wrong orientDB password throws exception"""
