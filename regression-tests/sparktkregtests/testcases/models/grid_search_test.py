@@ -224,7 +224,7 @@ class GridSearchTest(sparktk_test.SparkTKTestCase):
         self.assertEqual(
             grid_points[2].descriptor.kwargs['num_classes'], 2)
 
-    def test_find_best_default(self):
+    def test_find_best_classifier_default(self):
         """Test find best in grid_search with default eval function"""
         grid_result = self.context.models.grid_search(
             self.classifier_frame, self.classifier_frame,
@@ -254,7 +254,7 @@ class GridSearchTest(sparktk_test.SparkTKTestCase):
             0.87688,
             delta=0.01)
 
-    def test_find_best_with_eval(self):
+    def test_find_best_regressor_with_eval(self):
         """Test find best in grid_search with custom eval function"""
         grid_result = self.context.models.grid_search(
             self.regressor_frame, self.regressor_frame,
@@ -377,7 +377,7 @@ class GridSearchTest(sparktk_test.SparkTKTestCase):
                     "num_iterations": grid_values(1, 4),
                     "step_size": 0.001})])
 
-    def test_bad_eval_name(self):
+    def test_invalid_eval_name(self):
         """Test grid search throws exception for invalid model name"""
         grid_result = self.context.models.grid_search(
             self.classifier_frame, self.classifier_frame,
